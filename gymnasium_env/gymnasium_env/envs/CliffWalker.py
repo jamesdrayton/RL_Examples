@@ -12,10 +12,10 @@ class Actions(Enum):
     down = 3
 
 
-class GridWorldEnv(gym.Env):
+class CliffWalker(gym.Env):
     metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
 
-    def __init__(self, render_mode=None, size=(12,4):
+    def __init__(self, render_mode=None, size=(12,4)):
         self.xsize, self.ysize = size   # The size of the square grid
         self.window_xsize = 3*512
         self.window_ysize = 512         # The size of the PyGame window
@@ -26,10 +26,10 @@ class GridWorldEnv(gym.Env):
         self.observation_space = spaces.Dict(
             {
                 "agent": spaces.Box(low=np.array([0,0]),
-                high=np.array([self.xsize-1,self.ysize-1]) 
+                high=np.array([self.xsize-1,self.ysize-1]), 
                 shape=(2,), dtype=int),
                 "target": spaces.Box(low=np.array([0,0]),
-                high=np.array([self.xsize-1,self.ysize-1]) 
+                high=np.array([self.xsize-1,self.ysize-1]), 
                 shape=(2,), dtype=int),
             }
         )
@@ -78,11 +78,10 @@ class GridWorldEnv(gym.Env):
 
         # Choose the agent's location uniformly at random
         self._agent_location = self.np_random.integers(low=np.array([0,0]),
-                high=np.array([self.xsize-1,self.ysize-1]) 
+                high=np.array([self.xsize-1,self.ysize-1]), 
                 size=2, dtype=int)
 
-        # We will sample the target's location randomly until it does not
-        # coincide with the agent's location
+        # The target should stay in the same place, should this change?
         self._target_location = self._agent_location
         while np.array_equal(self._target_location, self._agent_location):
             self._target_location = self.np_random.integers(
@@ -102,7 +101,8 @@ class GridWorldEnv(gym.Env):
         direction = self._action_to_direction[action]
         # We use `np.clip` to make sure we don't leave the grid
         self._agent_location = np.clip(
-            self._agent_location + direction, 0, self.size - 1
+            self._agent_location + direction, 
+            a_min=[0, 0], a_max=[self.xsize - 1, self.ysize - 1]
         )
         # An episode is done iff the agent has reached the target
         terminated = np.array_equal(self._agent_location, self._target_location)
@@ -123,14 +123,14 @@ class GridWorldEnv(gym.Env):
         if self.window is None and self.render_mode == "human":
             pygame.init()
             pygame.display.init()
-            self.window = pygame.display.set_mode((self.window_size, self.window_size))
+            self.window = pygame.display.set_mode((self.window_xsize, self.window_ysize))
         if self.clock is None and self.render_mode == "human":
             self.clock = pygame.time.Clock()
 
-        canvas = pygame.Surface((self.window_size, self.window_size))
+        canvas = pygame.Surface((self.window_xsize, self.window_ysize))
         canvas.fill((255, 255, 255))
         pix_square_size = (
-            self.window_size / self.size
+            self.window_xsize / self.xsize
         )  # The size of a single grid square in pixels
 
         # First we draw the target
@@ -150,20 +150,22 @@ class GridWorldEnv(gym.Env):
             pix_square_size / 3,
         )
 
-        # Finally, add some gridlines
-        for x in range(self.size + 1):
+        # Finally, add some gridlines for y
+        for x in range(self.ysize + 1):
             pygame.draw.line(
                 canvas,
                 0,
                 (0, pix_square_size * x),
-                (self.window_size, pix_square_size * x),
+                (self.window_xsize, pix_square_size * x),
                 width=3,
             )
+        # and for x
+        for x in range(self.xsize + 1):
             pygame.draw.line(
                 canvas,
                 0,
                 (pix_square_size * x, 0),
-                (pix_square_size * x, self.window_size),
+                (pix_square_size * x, self.window_ysize),
                 width=3,
             )
 

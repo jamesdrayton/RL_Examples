@@ -1,6 +1,7 @@
 import gymnasium
 import gymnasium_env
-env = gymnasium.make("gymnasium_env/GridWorld-v0", render_mode="human")
+print(gymnasium.envs.registry.keys())
+env = gymnasium.make("gymnasium_env/CliffWalker-v0", render_mode="human")
 observation, info = env.reset()
 
 # do a random action 1000 times
