@@ -13,12 +13,12 @@ class Actions(Enum):
 
 
 class CliffWalker(gym.Env):
-    metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 4}
+    metadata = {"render_modes": ["human", "rgb_array"], "render_fps": 60}
 
-    def __init__(self, render_mode=None, size=(12,4)):
+    def __init__(self, render_mode=None, size=(12,3)):
         self.xsize, self.ysize = size   # The size of the square grid
-        self.window_xsize = 3*512
-        self.window_ysize = 512         # The size of the PyGame window
+        self.window_xsize = 2*256
+        self.window_ysize = 256         # The size of the PyGame window
 
         # Observations are dictionaries with the agent's and the target's location.
         # Each location is encoded as an element of {0, ..., `size`}^2,
@@ -26,10 +26,10 @@ class CliffWalker(gym.Env):
         self.observation_space = spaces.Dict(
             {
                 "agent": spaces.Box(low=np.array([0,0]),
-                high=np.array([self.xsize-1,self.ysize-1]), 
+                high=np.array([self.xsize,self.ysize]), 
                 shape=(2,), dtype=int),
                 "target": spaces.Box(low=np.array([0,0]),
-                high=np.array([self.xsize-1,self.ysize-1]), 
+                high=np.array([self.xsize,self.ysize]), 
                 shape=(2,), dtype=int),
             }
         )
@@ -44,9 +44,9 @@ class CliffWalker(gym.Env):
         """
         self._action_to_direction = {
             Actions.right.value: np.array([1, 0]),
-            Actions.up.value: np.array([0, 1]),
+            Actions.up.value: np.array([0, -1]),
             Actions.left.value: np.array([-1, 0]),
-            Actions.down.value: np.array([0, -1]),
+            Actions.down.value: np.array([0, 1]),
         }
 
         assert render_mode is None or render_mode in self.metadata["render_modes"]
@@ -76,17 +76,11 @@ class CliffWalker(gym.Env):
         # We need the following line to seed self.np_random
         super().reset(seed=seed)
 
-        # Choose the agent's location uniformly at random
-        self._agent_location = self.np_random.integers(low=np.array([0,0]),
-                high=np.array([self.xsize-1,self.ysize-1]), 
-                size=2, dtype=int)
+        # Choose the agent's location uniformly at random (changed to always [0,3]
+        self._agent_location = np.array([0,3])
 
-        # The target should stay in the same place, should this change?
-        self._target_location = self._agent_location
-        while np.array_equal(self._target_location, self._agent_location):
-            self._target_location = self.np_random.integers(
-                0, self.size, size=2, dtype=int
-            )
+        # The target should stay in the same place, now [11,3]
+        self._target_location = np.array([11,3])
 
         observation = self._get_obs()
         info = self._get_info()
@@ -102,18 +96,20 @@ class CliffWalker(gym.Env):
         # We use `np.clip` to make sure we don't leave the grid
         self._agent_location = np.clip(
             self._agent_location + direction, 
-            a_min=[0, 0], a_max=[self.xsize - 1, self.ysize - 1]
+            a_min=[0, 0], a_max=[self.xsize-1, self.ysize]
         )
-        # An episode is done iff the agent has reached the target
+        # An episode is done if the agent has reached the target
         terminated = np.array_equal(self._agent_location, self._target_location)
-        reward = 1 if terminated else 0  # Binary sparse rewards
+        # An episode is truncated/cliff if it falls off the cliff
+        cliff = (self._agent_location[0] < 11) and (self._agent_location[0] > 0) and (self._agent_location[1] == 3)
+        reward = 0  # redefined in qlearning
         observation = self._get_obs()
         info = self._get_info()
 
         if self.render_mode == "human":
             self._render_frame()
 
-        return observation, reward, terminated, False, info
+        return observation, reward, terminated, cliff, info
 
     def render(self):
         if self.render_mode == "rgb_array":
@@ -160,7 +156,7 @@ class CliffWalker(gym.Env):
                 width=3,
             )
         # and for x
-        for x in range(self.xsize + 1):
+        for x in range(self.xsize):
             pygame.draw.line(
                 canvas,
                 0,
